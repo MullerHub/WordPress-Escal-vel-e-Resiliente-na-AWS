@@ -1,4 +1,4 @@
-# WordPress-Escal-vel-e-Resiliente-na-AWS
+# WordPress-Escalavel-e-Resiliente-na-AWS
 
 Documentação do Projeto: WordPress Escalável e Resiliente na AWS
 Data de Criação: 4 de Setembro de 2025
