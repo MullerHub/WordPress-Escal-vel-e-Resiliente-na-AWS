@@ -11,6 +11,9 @@ O objetivo deste projeto é implantar uma aplicação WordPress na nuvem da AWS 
 
 1.2. Diagrama da Arquitetura
 
+<img width="680" height="319" alt="Captura de Tela 2025-09-04 às 21 51 01" src="https://github.com/user-attachments/assets/6759767b-6158-4ba2-b5a1-54b0ad3dba51" />
+
+
 O projeto segue o padrão de uma aplicação web de três camadas (web, dados, armazenamento), utilizando os seguintes componentes principais:
 
 1.3. Componentes Principais
