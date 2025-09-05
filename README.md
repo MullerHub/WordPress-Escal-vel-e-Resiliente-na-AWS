@@ -1,17 +1,14 @@
-# WordPress-Escalavel-e-Resiliente-na-AWS
-
-Documentação do Projeto: WordPress Escalável e Resiliente na AWS
+Documentação: WordPress Escalável e Resiliente na AWS
 Data de Criação: 4 de Setembro de 2025
 
 1. Visão Geral e Arquitetura
-
 1.1. Objetivo
 
 O objetivo deste projeto é implantar uma aplicação WordPress na nuvem da AWS de forma segura, escalável, resiliente e automatizada. A arquitetura é projetada para lidar com variações de tráfego, se recuperar de falhas e automatizar a configuração de novos servidores web.
 
 1.2. Diagrama da Arquitetura
 
-<img width="680" height="319" alt="Captura de Tela 2025-09-04 às 21 51 01" src="https://github.com/user-attachments/assets/6759767b-6158-4ba2-b5a1-54b0ad3dba51" />
+<img width="680" height="319" alt="Captura de Tela 2025-09-04 às 21 51 01" src="https://github.com/user-attachments/assets/6759767b-6158-4ba2-b5a1-54b0ad3dba51" />
 
 
 O projeto segue o padrão de uma aplicação web de três camadas (web, dados, armazenamento), utilizando os seguintes componentes principais:
@@ -35,12 +32,9 @@ EFS (Elastic File System): O sistema de arquivos de rede compartilhado, onde fic
 Bastion Host: Uma instância EC2 na sub-rede pública que serve como um ponto de acesso seguro para gerenciar os recursos na sub-rede privada.
 
 2. Guia de Implementação Passo a Passo
-
 Etapa 1: Fundação da Rede (VPC)
 
-Criar VPC: No console da VPC, use a opção "VPC e mais".
-
-Configurações:
+Crie a VPC no console da AWS usando a opção "VPC e mais".
 
 Nome: wordpress-vpc
 
@@ -128,11 +122,12 @@ Detalhes Avançados:
 
 Crie e associe um Perfil IAM (ec2-wordpress-role) com a permissão AmazonSSMManagedInstanceCore.
 
+Adicione as Tags corporativas obrigatórias ao template.
+
 No campo User Data, cole o script abaixo, substituindo os placeholders:
 
 ```
-Bash
-#!/bin/bash
+ #!/bin/bash
 # Update and install necessary packages
 yum update -y
 yum install -y docker
@@ -171,10 +166,10 @@ services:
     ports:
       - "80:80"
     environment:
-      WORDPRESS_DB_HOST: ${RDS_DB_HOST}
-      WORDPRESS_DB_NAME: ${RDS_DB_NAME}
-      WORDPRESS_DB_USER: ${RDS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${RDS_DB_PASSWORD}
+      WORDPRESS_DB_HOST: \${RDS_DB_HOST}
+      WORDPRESS_DB_NAME: \${RDS_DB_NAME}
+      WORDPRESS_DB_USER: \${RDS_DB_USER}
+      WORDPRESS_DB_PASSWORD: \${RDS_DB_PASSWORD}
     volumes:
       - /var/www/html:/var/www/html
 EOF
@@ -192,13 +187,11 @@ docker-compose up -d
 
 ```
 
-Adicione as Tags corporativas obrigatórias ao template.
-
 Etapa 6: A Porta de Entrada (Application Load Balancer)
 
 Crie um Target Group (wordpress-tg) para instâncias na porta HTTP 80.
 
-Crie um Application Load Balancer (wordpress-alb) do tipo "Internet-facing".
+Crie um Application Load Balancer (wordpress-alb) do tipo Internet-facing.
 
 Coloque-o nas duas sub-redes públicas.
 
@@ -221,18 +214,17 @@ Defina a capacidade: Desejada 2, Mínima 1, Máxima 4.
 Defina a política de escalabilidade: Utilização média da CPU com alvo em 50%.
 
 3. Lições Aprendidas e Solução de Problemas
-
 Problema 1: Erro de Permissão (You are not authorized...) na Criação do ASG.
 
 Causa Raiz: Políticas de IAM corporativas que exigem tags em recursos.
 
 Solução: Adicionar as tags (Name, CostCenter, Project) ao Launch Template (para Instâncias e Volumes) e também às Sub-redes Privadas.
 
-Problema 2: Erro de Operation timed out ao Conectar via SSH ao Bastion.
+Problema 2: Erro de Operation timed out ao Conectar via SSH ao Bastion Host.
 
 Causa Raiz: O IP público do usuário mudou, ou a rede do usuário usa CGNAT, fazendo com que o IP visto pela AWS seja diferente do IP visto pelo usuário.
 
-Solução: Conectar-se temporariamente com a regra do SG aberta para 0.0.0.0/0. De dentro da instância, executar o comando who para descobrir o IP de origem real. Atualizar a regra do SG bastion-sg com este IP exato.
+Solução: Conectar-se temporariamente com a regra do SG aberta para 0.0.0.0/0. De dentro da instância, executar o comando who para descobrir o IP de origem real. Atualizar a regra do bastion-sg com este IP exato.
 
 Problema 3: Loop de Instâncias "Não Saudáveis" (Unhealthy).
 
@@ -243,7 +235,6 @@ Diagnóstico: Análise do log /var/log/cloud-init-output.log.
 Solução: O erro estava na associação de Security Groups. A instância EC2 estava sendo criada com o SG default, enquanto o EFS esperava uma conexão do webserver-sg. A correção foi modificar o Launch Template para que ele atribuísse o webserver-sg corretamente às instâncias no momento da criação.
 
 4. Próximos Passos e Melhorias
-
 DNS e Domínio: Usar o Amazon Route 53 para apontar um domínio personalizado para o DNS do Application Load Balancer.
 
 HTTPS: Usar o AWS Certificate Manager (ACM) para gerar um certificado SSL gratuito e associá-lo ao ALB, criando um Listener na porta 443.
@@ -251,4 +242,6 @@ HTTPS: Usar o AWS Certificate Manager (ACM) para gerar um certificado SSL gratui
 Segurança de Credenciais: Remover a senha do banco de dados do script user-data e armazená-la de forma segura no AWS Secrets Manager ou SSM Parameter Store. O IAM Role da instância seria usado para dar permissão de leitura.
 
 Automação da Infraestrutura (IaC): Traduzir todo este processo manual para um template do AWS CloudFormation ou Terraform, permitindo que toda a arquitetura seja criada e destruída com um único comando.
+
+
 
