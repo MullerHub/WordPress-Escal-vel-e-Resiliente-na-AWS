@@ -130,6 +130,7 @@ Crie e associe um Perfil IAM (ec2-wordpress-role) com a permissão AmazonSSMMana
 
 No campo User Data, cole o script abaixo, substituindo os placeholders:
 
+```
 Bash
 #!/bin/bash
 # Update and install necessary packages
@@ -188,6 +189,9 @@ chmod +x /usr/local/bin/docker-compose
 # Start WordPress container using docker-compose
 cd /home/ec2-user/
 docker-compose up -d
+
+```
+
 Adicione as Tags corporativas obrigatórias ao template.
 
 Etapa 6: A Porta de Entrada (Application Load Balancer)
