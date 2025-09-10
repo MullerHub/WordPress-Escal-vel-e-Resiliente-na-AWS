@@ -27,6 +27,7 @@ KeyName: "Qual é o nome da sua chave-mestra para entrar nas salas de serviço?"
 
 YourIPForSSH: "Qual é o seu endereço de casa? Só vamos permitir que você entre na sala de segurança."
 
+```
 +-------------------------------------------------+
 |               FORMULÁRIO DE PEDIDO              |
 +-------------------------------------------------+
@@ -34,6 +35,8 @@ YourIPForSSH: "Qual é o seu endereço de casa? Só vamos permitir que você ent
 | Nome da Chave:  [ MinhaChaveSecreta ]           |
 | Seu Endereço:   [ 1.2.3.4/32 ]                  |
 +-------------------------------------------------+
+```
+
 Resources (A Lista de Construção)
 
 Esta é a parte principal, onde listamos tudo o que precisamos construir.
@@ -54,6 +57,7 @@ NatGateway: Construímos uma porta de saída segura para os funcionários. As lo
 
 RouteTables: Desenhamos as placas de trânsito que dizem aos carros como chegar ao portão principal (se estiverem na área pública) ou como usar a porta de saída de serviço (se estiverem na área restrita).
 
+```
           +--------------------------------------+
           |           TERRENO CERCADO (VPC)      |
           |                                      |
@@ -65,6 +69,9 @@ RouteTables: Desenhamos as placas de trânsito que dizem aos carros como chegar 
           |  | Área Pública B |     | Área Privada B |   |
           |  +------------+     +------------+   |
           +--------------------------------------+
+```
+
+
 2. Os Seguranças (Security Groups)
 
 Agora, colocamos seguranças em cada porta, com regras claras. Cada segurança tem um "crachá" diferente.
