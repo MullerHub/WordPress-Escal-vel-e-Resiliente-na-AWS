@@ -13,235 +13,112 @@ O objetivo deste projeto é implantar uma aplicação WordPress na nuvem da AWS 
 
 O projeto segue o padrão de uma aplicação web de três camadas (web, dados, armazenamento), utilizando os seguintes componentes principais:
 
-1.3. Componentes Principais
+Explicacao do projeto para leigos totais
 
-VPC (Virtual Private Cloud): Rede privada e isolada na AWS, dividida em sub-redes públicas e privadas para segurança.
+A Planta Baixa do Nosso "Shopping Center" (Tradução do Template)
 
-Application Load Balancer (ALB): A porta de entrada pública. Distribui o tráfego de entrada entre os servidores web.
+Parameters (O Formulário de Pedido)
 
-Auto Scaling Group (ASG): O cérebro da automação. Cria e destrói instâncias EC2 com base na demanda (uso de CPU).
+Antes de começar a construir, precisamos de algumas informações suas. Esta seção é como um formulário que você preenche:
 
-EC2 (Elastic Compute Cloud): Servidores virtuais que rodam a aplicação WordPress dentro de contêineres Docker.
+DBPassword: "Qual será a senha secreta para o cofre principal (o banco de dados)?"
 
-Launch Template: O "blueprint" ou "molde" que o ASG usa para criar novas instâncias EC2.
+KeyName: "Qual é o nome da sua chave-mestra para entrar nas salas de serviço?"
 
-RDS (Relational Database Service): O banco de dados MySQL gerenciado, onde ficam armazenados posts, páginas, usuários, etc.
+YourIPForSSH: "Qual é o seu endereço de casa? Só vamos permitir que você entre na sala de segurança."
 
-EFS (Elastic File System): O sistema de arquivos de rede compartilhado, onde ficam os arquivos do WordPress (uploads, temas, plugins).
++-------------------------------------------------+
+|               FORMULÁRIO DE PEDIDO              |
++-------------------------------------------------+
+| Senha do Cofre: [ ********* ]                   |
+| Nome da Chave:  [ MinhaChaveSecreta ]           |
+| Seu Endereço:   [ 1.2.3.4/32 ]                  |
++-------------------------------------------------+
+Resources (A Lista de Construção)
 
-Bastion Host: Uma instância EC2 na sub-rede pública que serve como um ponto de acesso seguro para gerenciar os recursos na sub-rede privada.
+Esta é a parte principal, onde listamos tudo o que precisamos construir.
 
-2. Guia de Implementação Passo a Passo
-Etapa 1: Fundação da Rede (VPC)
+1. A Fundação e o Terreno (VPC, Subnets, Gateways)
 
-Crie a VPC no console da AWS usando a opção "VPC e mais".
+Primeiro, preparamos o terreno e a estrutura principal do shopping.
 
-Nome: wordpress-vpc
+VPC: Compramos um grande terreno cercado. Ninguém entra ou sai sem nossa permissão.
 
-Bloco CIDR: 10.0.0.0/16
+PublicSubnetA / PublicSubnetB: Dentro do terreno, criamos duas "Áreas Públicas", como o estacionamento e a praça de entrada. Elas ficam em dois prédios diferentes (A e B) para que, se um tiver um problema, o outro continue funcionando.
 
-Zonas de Disponibilidade (AZs): 2
+PrivateSubnetA / PrivateSubnetB: Também criamos duas "Áreas Restritas" e seguras, onde as lojas de verdade ficarão. Elas também ficam nos prédios A e B.
 
-Sub-redes Públicas: 2
+InternetGateway: Construímos o portão principal do estacionamento, conectando nosso shopping à rua (internet).
 
-Sub-redes Privadas: 2
+NatGateway: Construímos uma porta de saída segura para os funcionários. As lojas na área restrita podem buscar coisas na rua (como atualizações de software), mas ninguém da rua pode entrar por essa porta.
 
-Gateways NAT: Em 1 AZ
+RouteTables: Desenhamos as placas de trânsito que dizem aos carros como chegar ao portão principal (se estiverem na área pública) ou como usar a porta de saída de serviço (se estiverem na área restrita).
 
-Etapa 2: Configuração de Segurança (Security Groups)
+          +--------------------------------------+
+          |           TERRENO CERCADO (VPC)      |
+          |                                      |
+---> RUA  |  +------------+     +------------+   |
+(Internet)|  | Área Pública A |     | Área Privada A |   |
+<---      |  +------------+     +------------+   |
+(IGW)     |                                      |
+          |  +------------+     +------------+   |
+          |  | Área Pública B |     | Área Privada B |   |
+          |  +------------+     +------------+   |
+          +--------------------------------------+
+2. Os Seguranças (Security Groups)
 
-Crie 4 Security Groups (SGs) baseados em função:
+Agora, colocamos seguranças em cada porta, com regras claras. Cada segurança tem um "crachá" diferente.
 
-alb-sg (Para o Load Balancer):
+ALBSecurityGroup: O segurança da entrada principal do shopping. Ele tem uma ordem: "Deixe qualquer cliente (tráfego da porta 80) entrar".
 
-Regra de Entrada: Permitir HTTP (porta 80) de Qualquer Lugar (0.0.0.0/0).
+BastionSecurityGroup: O segurança da sala de controle. A ordem é: "Só deixe entrar a pessoa que mora no endereço X (o seu IP) e que tenha a chave-mestra".
 
-bastion-sg (Para o Bastion Host):
+WebServerSecurityGroup: Os seguranças das lojas. Eles têm três ordens:
 
-Regra de Entrada: Permitir SSH (porta 22) de Meu IP.
+"Deixe entrar os clientes que o segurança da porta principal (ALBSecurityGroup) mandar."
 
-webserver-sg (Para as Instâncias WordPress e EFS):
+"Deixe a pessoa da sala de controle (BastionSecurityGroup) entrar para manutenção."
 
-Regra de Entrada 1: Permitir HTTP (porta 80) da Origem alb-sg.
+"Lojas que usam este mesmo crachá podem conversar entre si (para o EFS)."
 
-Regra de Entrada 2: Permitir SSH (porta 22) da Origem bastion-sg.
+DatabaseSecurityGroup: O segurança do cofre principal. A ordem é simples: "Só deixe entrar quem tiver o crachá de funcionário da loja (WebServerSecurityGroup)".
 
-Regra de Entrada 3 (Crucial): Permitir NFS (porta 2049) da Origem webserver-sg (regra de auto-referência).
+3. O Cofre e o Almoxarifado (RDS e EFS)
 
-database-sg (Para o Banco de Dados RDS):
+As partes mais importantes do nosso shopping.
 
-Regra de Entrada: Permitir MySQL (porta 3306) da Origem webserver-sg.
+EFSFileSystem: Construímos um almoxarifado central e compartilhado. Todas as lojas podem guardar e pegar produtos (imagens, temas, plugins) aqui.
 
-Etapa 3: Camada de Dados (EFS e RDS)
+RDSInstance: Construímos o cofre principal e super seguro. É aqui que todo o dinheiro e os registros importantes (posts, usuários) são guardados. Ele fica na área restrita, protegido pelo seu segurança.
 
-Criar EFS:
+4. O Porteiro e a Sala de Controle (Bastion Host)
 
-Crie um sistema de arquivos EFS na wordpress-vpc.
+BastionHost: Construímos uma sala de controle segura na área pública. É a partir daqui que o gerente (você) pode acessar as áreas restritas para fazer manutenção, usando sua chave-mestra.
 
-Na configuração de rede, crie "Pontos de Montagem" nas duas sub-redes privadas, associando o Security Group webserver-sg a eles.
+5. A Loja e a Fábrica (ALB, Launch Template, ASG)
 
-Crie um "Ponto de Acesso" com User ID 33 e Group ID 33.
+Agora, montamos a loja do WordPress.
 
-Criar RDS:
+AppLoadBalancer (ALB): É o recepcionista inteligente na porta principal do shopping. Ele recebe todos os clientes e os direciona para o caixa (servidor) que estiver mais livre e funcionando bem.
 
-Crie uma instância de banco de dados MySQL.
+AppLaunchTemplate: É a planta de montagem de um quiosque do WordPress. Ela tem todas as instruções: o tamanho, o sistema, as ferramentas necessárias e um manual de instruções (UserData) que ensina o quiosque a se conectar ao cofre e ao almoxarifado assim que for construído.
 
-Modelo: Produção para Multi-AZ (recomendado) ou Nível Gratuito para Single-AZ.
+AppAutoScalingGroup (ASG): É a fábrica de quiosques. O gerente da fábrica (ASG) tem ordens simples:
 
-Coloque a instância na wordpress-vpc, nas sub-redes privadas.
+"Sempre mantenha 2 quiosques funcionando."
 
-Defina "Acesso Público" como Não.
+"Se a fila de clientes ficar muito grande (CPU acima de 50%), construa mais um quiosque usando a planta (Launch Template)."
 
-Associe o Security Group database-sg.
+"Se a loja ficar vazia, desmonte um quiosque para economizar espaço."
 
-Anote as credenciais: Endpoint, Nome do DB, Usuário e Senha.
+"Todo quiosque novo, avise ao recepcionista (ALB) que ele está pronto para receber clientes."
 
-Etapa 4: Acesso de Gerenciamento (Bastion Host)
+Outputs (O Painel de Informações)
 
-Lance uma instância EC2 t2.micro com Amazon Linux 2023.
+Depois que a construção termina, esta seção nos entrega um painel com os endereços mais importantes:
 
-Coloque-a em uma sub-rede pública da wordpress-vpc.
+WebsiteURL: "Aqui está o endereço principal do seu shopping para você divulgar aos clientes."
 
-Associe o Security Group bastion-sg.
+BastionEIP: "E aqui está o endereço secreto da sua sala de controle."
 
-Crie e associe um Elastic IP a ela.
-
-Etapa 5: O Blueprint da Aplicação (Launch Template)
-
-Crie um novo Launch Template (wordpress-launch-template).
-
-AMI: Amazon Linux 2023.
-
-Tipo de Instância: t2.micro.
-
-Par de Chaves: A mesma chave usada no Bastion.
-
-Configurações de Rede: Deixe a Sub-rede em branco. Associe o Security Group webserver-sg.
-
-Detalhes Avançados:
-
-Crie e associe um Perfil IAM (ec2-wordpress-role) com a permissão AmazonSSMManagedInstanceCore.
-
-Adicione as Tags corporativas obrigatórias ao template.
-
-No campo User Data, cole o script abaixo, substituindo os placeholders:
-
-```
- #!/bin/bash
-# Update and install necessary packages
-yum update -y
-yum install -y docker
-yum install -y amazon-efs-utils
-
-# Start and enable Docker service
-systemctl start docker
-systemctl enable docker
-usermod -a -G docker ec2-user
-
-# Add a custom prompt to the .bashrc for easier identification
-echo "export PS1='\[\e[0;31m\][\u@\h] WORDPRESS> \[\e[0m\]'" >> /home/ec2-user/.bashrc
-
-# --- PREENCHA SUAS INFORMAÇÕES AQUI ---
-EFS_FILE_SYSTEM_ID="<SEU_EFS_ID>"
-RDS_DB_HOST="<SEU_RDS_ENDPOINT>"
-RDS_DB_NAME="<SEU_NOME_DO_DB>"
-RDS_DB_USER="<SEU_USUARIO_DO_DB>"
-RDS_DB_PASSWORD="<SUA_SENHA_DO_DB>"
-# --- FIM DA SEÇÃO DE INFORMAÇÕES ---
-
-# Create a directory to mount EFS
-mkdir -p /var/www/html
-
-# Mount EFS file system
-mount -t efs -o tls ${EFS_FILE_SYSTEM_ID}:/ /var/www/html
-
-# Create docker-compose.yml file
-cat << EOF > /home/ec2-user/docker-compose.yml
-version: '3'
-services:
-  wordpress:
-    image: wordpress:latest
-    container_name: wordpress
-    restart: always
-    ports:
-      - "80:80"
-    environment:
-      WORDPRESS_DB_HOST: \${RDS_DB_HOST}
-      WORDPRESS_DB_NAME: \${RDS_DB_NAME}
-      WORDPRESS_DB_USER: \${RDS_DB_USER}
-      WORDPRESS_DB_PASSWORD: \${RDS_DB_PASSWORD}
-    volumes:
-      - /var/www/html:/var/www/html
-EOF
-
-# Change ownership of the docker-compose file
-chown ec2-user:ec2-user /home/ec2-user/docker-compose.yml
-
-# Install docker-compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-
-# Start WordPress container using docker-compose
-cd /home/ec2-user/
-docker-compose up -d
-
-```
-
-Etapa 6: A Porta de Entrada (Application Load Balancer)
-
-Crie um Target Group (wordpress-tg) para instâncias na porta HTTP 80.
-
-Crie um Application Load Balancer (wordpress-alb) do tipo Internet-facing.
-
-Coloque-o nas duas sub-redes públicas.
-
-Associe o Security Group alb-sg.
-
-Configure o "Listener" da porta 80 para encaminhar o tráfego para o wordpress-tg.
-
-Etapa 7: O Motor da Automação (Auto Scaling Group)
-
-Crie um Auto Scaling Group (wordpress-asg).
-
-Associe-o ao wordpress-launch-template (versão mais recente).
-
-Configure-o para usar as duas sub-redes privadas.
-
-Anexe-o ao Target Group wordpress-tg e habilite a verificação de saúde ELB.
-
-Defina a capacidade: Desejada 2, Mínima 1, Máxima 4.
-
-Defina a política de escalabilidade: Utilização média da CPU com alvo em 50%.
-
-3. Lições Aprendidas e Solução de Problemas
-Problema 1: Erro de Permissão (You are not authorized...) na Criação do ASG.
-
-Causa Raiz: Políticas de IAM corporativas que exigem tags em recursos.
-
-Solução: Adicionar as tags (Name, CostCenter, Project) ao Launch Template (para Instâncias e Volumes) e também às Sub-redes Privadas.
-
-Problema 2: Erro de Operation timed out ao Conectar via SSH ao Bastion Host.
-
-Causa Raiz: O IP público do usuário mudou, ou a rede do usuário usa CGNAT, fazendo com que o IP visto pela AWS seja diferente do IP visto pelo usuário.
-
-Solução: Conectar-se temporariamente com a regra do SG aberta para 0.0.0.0/0. De dentro da instância, executar o comando who para descobrir o IP de origem real. Atualizar a regra do bastion-sg com este IP exato.
-
-Problema 3: Loop de Instâncias "Não Saudáveis" (Unhealthy).
-
-Causa Raiz: Falha na montagem do EFS (mount timeout) devido a um erro de conectividade de rede.
-
-Diagnóstico: Análise do log /var/log/cloud-init-output.log.
-
-Solução: O erro estava na associação de Security Groups. A instância EC2 estava sendo criada com o SG default, enquanto o EFS esperava uma conexão do webserver-sg. A correção foi modificar o Launch Template para que ele atribuísse o webserver-sg corretamente às instâncias no momento da criação.
-
-4. Próximos Passos e Melhorias
-DNS e Domínio: Usar o Amazon Route 53 para apontar um domínio personalizado para o DNS do Application Load Balancer.
-
-HTTPS: Usar o AWS Certificate Manager (ACM) para gerar um certificado SSL gratuito e associá-lo ao ALB, criando um Listener na porta 443.
-
-Segurança de Credenciais: Remover a senha do banco de dados do script user-data e armazená-la de forma segura no AWS Secrets Manager ou SSM Parameter Store. O IAM Role da instância seria usado para dar permissão de leitura.
-
-Automação da Infraestrutura (IaC): Traduzir todo este processo manual para um template do AWS CloudFormation ou Terraform, permitindo que toda a arquitetura seja criada e destruída com um único comando.
-
-
-
+Em resumo, este template é a receita completa e detalhada para construir, do zero, um shopping center digital, seguro e que cresce sozinho de acordo com o movimento
