@@ -13,7 +13,7 @@ O objetivo deste projeto é implantar uma aplicação WordPress na nuvem da AWS 
 
 O projeto segue o padrão de uma aplicação web de três camadas (web, dados, armazenamento), utilizando os seguintes componentes principais:
 
-Explicacao do projeto para leigos totais
+## Explicacao do projeto para leigos totais
 
 A Planta Baixa do Nosso "Shopping Center" (Tradução do Template)
 
