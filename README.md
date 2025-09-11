@@ -2,56 +2,14 @@
 
 ## 1. Resumo do Projeto
 
-1.2. Diagrama da Arquitetura
-
 <img width="680" height="319" alt="Captura de Tela 2025-09-04 às 21 51 01" src="https://github.com/user-attachments/assets/6759767b-6158-4ba2-b5a1-54b0ad3dba51" />
 <br> <br>
 
-Este documento detalha a arquitetura e o processo de implantação de uma infraestrutura completa para hospedar um site WordPress na nuvem AWS. A solução foi projetada para ser altamente disponível, escalável e segura, utilizando as melhores práticas de nuvem e automação com Infraestrutura como Código (IaC) através do AWS CloudFormation.
-
-## 2. Arquitetura da Solução
-
-A arquitetura é desacoplada em múltiplas camadas (rede, dados, aplicação) para garantir segurança e escalabilidade independentes.
-
-### 2.1. Diagrama do Fluxo de Tráfego
-
-`Visitante (Internet)` -> `Application Load Balancer (ALB)` -> `Instâncias EC2 (WordPress em Docker)` -> `Amazon RDS (Banco de Dados)` & `Amazon EFS (Arquivos)`
-
-### 2.2. Componentes Principais
-
-* **VPC (Virtual Private Cloud):**
-    * **Função:** Cria uma rede privada e isolada na AWS para hospedar todos os recursos.
-    * **Detalhes:** CIDR `10.0.0.0/16`, dividida em 4 sub-redes para alta disponibilidade em duas Zonas de Disponibilidade (AZs).
-    * **Sub-redes Públicas:** Duas sub-redes (`10.0.1.0/24`, `10.0.2.0/24`) para recursos que precisam de acesso direto à internet, como o Application Load Balancer.
-    * **Sub-redes Privadas:** Duas sub-redes (`10.0.10.0/24`, `10.0.11.0/24`) para proteger os recursos principais (Instâncias EC2 e Banco de Dados RDS), que não devem ser acessíveis publicamente.
-    * **Internet Gateway (IGW):** Permite a comunicação entre a VPC e a internet.
-    * **NAT Gateway:** Permite que as instâncias nas sub-redes privadas iniciem conexões com a internet (para atualizações de software e download de imagens Docker) sem serem diretamente acessíveis.
-
-* **Amazon RDS (Relational Database Service):**
-    * **Função:** Prover um banco de dados MySQL gerenciado, seguro e escalável para armazenar todos os dados do WordPress (posts, páginas, usuários, configurações).
-    * **Detalhes:** Instância `db.t3.micro` rodando em sub-redes privadas e protegida por um Security Group que só permite conexões a partir das instâncias EC2.
-
-* **Amazon EFS (Elastic File System):**
-    * **Função:** Prover um sistema de arquivos de rede (NFS) compartilhado e elástico. É usado para armazenar todos os arquivos de mídia do WordPress (imagens, vídeos, uploads), temas e plugins.
-    * **Detalhes:** O EFS é montado no diretório `/var/www/html` de todas as instâncias EC2, garantindo que os arquivos sejam consistentes e persistentes, mesmo que instâncias sejam adicionadas ou removidas.
-
-* **EC2 Auto Scaling Group & Launch Template:**
-    * **Função:** Gerenciar automaticamente o número de instâncias EC2 para garantir a disponibilidade e escalar de acordo com a demanda.
-    * **Launch Template:** Define a "receita" para novas instâncias, incluindo o tipo de instância (`t2.micro`), a AMI, o par de chaves, o Security Group e o script `UserData`.
-    * **UserData Script:** Script de inicialização que automatiza a configuração de cada nova instância: instala e inicia o Docker, monta o EFS, cria o `docker-compose.yml` com as credenciais do banco e inicia o container do WordPress.
-    * **Escalabilidade:** A configuração inicial mantém um mínimo de 1 e um máximo de 4 instâncias, com 2 instâncias desejadas.
-
-* **Application Load Balancer (ALB):**
-    * **Função:** Distribuir o tráfego de entrada dos visitantes de forma equilibrada entre as instâncias EC2 saudáveis.
-    * **Detalhes:** O ALB fica nas sub-redes públicas. Ele realiza verificações de saúde (`Health Checks`) contínuas nas instâncias EC2 para garantir que o tráfego só seja enviado para servidores que estão funcionando corretamente.
-
-* **Bastion Host:**
-    * **Função:** Servir como um "ponto de pulo" seguro para acesso administrativo (via SSH) às instâncias EC2 que estão na rede privada. (nosso projeto nao esta funcionando por erro interno no "meu" endereco ipv4, mas pode ser que funciona normalmente em testes em sua maquina, sera solicitado o seu ip na importacao do cloudformation para essa conexao, mas iremos usar o Gerenciador de sessões para logar no bastion via console)
-    * **Detalhes:** É uma pequena instância EC2 na sub-rede pública com um Security Group que restringe o acesso SSH apenas a um IP específico.
+Este documento detalha a arquitetura e o processo de implantação de uma infraestrutura completa para hospedar um site WordPress na nuvem AWS seguindo os padroes da Compass. A solução foi projetada para ser altamente disponível, escalável e segura, utilizando as melhores práticas de nuvem e automação com Infraestrutura como Código (IaC) através do AWS CloudFormation.
 
 ## 3. Infraestrutura como Código (CloudFormation)
 
-Toda a infraestrutura descrita acima é definida no arquivo `template.yaml`, permitindo a criação e exclusão de todo o ambiente de forma automatizada e consistente.
+Toda a infraestrutura descrita acima é definida no arquivo `wordpress-full-stack.yaml`, permitindo a criação e exclusão de todo o ambiente de forma automatizada e consistente.
 
 ### 3.1. Parâmetros de Entrada
 
@@ -510,6 +468,15 @@ Outputs:
     Value: !Ref BastionEIP
     
 ```
+
+## ⚠️ Alerta Importante: Tempo de Implantação
+Toda a implantação da stack do CloudFormation demora, em média, de 30 a 45 minutos para ser concluída e estar totalmente funcional.
+
+A maior parte desse tempo é consumida pelo provisionamento de recursos mais complexos, como o banco de dados RDS e o NAT Gateway. Após a criação da infraestrutura, as instâncias EC2 ainda precisam executar o script de inicialização (UserData), que pode levar de 3 a 5 minutos.
+
+É normal que, durante este período, ao acessar a URL do site, você veja um erro 502 Bad Gateway. Este erro desaparecerá assim que as instâncias EC2 estiverem prontas e forem consideradas saudáveis (healthy) pelo Load Balancer.
+
+Após este período, a URL do site deverá responder com a tela de instalação do WordPress. Com esta documentação, qualquer membro da equipe pode implantar e gerenciar a infraestrutura com confiança
 
 
 
