@@ -479,8 +479,27 @@ A maior parte desse tempo é consumida pelo provisionamento de recursos mais com
 Após este período, a URL do site deverá responder com a tela de instalação do WordPress. Com esta documentação, qualquer membro da equipe pode implantar e gerenciar a infraestrutura com confiança
 
 
+## Evoluções Futuras
+Todo trabalho pesado e padroes corporativos ja foram implantados
 
-## Explicacao do projeto para leigos totais
+5.1. Habilitar HTTPS
+
+Utilizar o AWS Certificate Manager (ACM) para gerar um certificado SSL gratuito e configurar um Listener HTTPS no ALB para garantir a comunicação criptografada.
+
+5.2. Criar AMI Base
+
+Pré-instalar todo o software (Docker, etc.) em uma AMI customizada para acelerar drasticamente o tempo de inicialização de novas instâncias, melhorando o tempo de resposta do Auto Scaling. (ja fizemos isso no projeto, mas nao tem no cloudformation
+
+5.3. Monitoramento e Alarmes
+
+Configurar alarmes no CloudWatch para métricas como uso de CPU (para o Auto Scaling) e saúde do ALB, notificando os administradores sobre possíveis problemas.
+
+5.4. Segurança Avançada
+
+Utilizar o AWS Secrets Manager para gerenciar a senha do banco de dados em vez de passá-la como parâmetro. Adicionar um AWS WAF (Web Application Firewall) na frente do ALB para proteger contra ataques comuns da web.
+
+
+# Explicacao do projeto para leigos totais
 
 A Planta Baixa do Nosso "Shopping Center" (Tradução do Template)
 
